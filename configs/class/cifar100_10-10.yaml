@@ -22,3 +22,11 @@ increment: ${initial_increment}
 initial_increment: 10  
 scenario: "class"
 dataset: "cifar100"
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.1
+
+train_batch_size: 128
+num_workers: 4
+epochs: 10
+learning_rate: 1e-4

@@ -1,4 +1,3 @@
-
 import os
 import json
 import hydra
@@ -9,6 +8,9 @@ import torch
 import statistics
 from torch.utils.data import DataLoader
 from continuum.metrics import Logger
+from torch.nn import CrossEntropyLoss
+from torch.optim import Adam
+import pdb
 
 from tqdm import tqdm
 from continual_clip import utils
@@ -24,17 +26,41 @@ def run_class_incremental(cfg, device):
         cfg, is_train=False, transforms=model.transforms
     )
     model.classes_names = classes_names
+    train_dataset, _ = build_cl_scenarios(
+    cfg, is_train=True, transforms=model.transforms)
+
+    optimizer = Adam(model.parameters(), lr=cfg.learning_rate)
+    criterion = CrossEntropyLoss()
+    epochs = cfg.epochs
     
     acc_list = []
     metric_logger = Logger(list_subsets=["test"])
     for task_id, _ in enumerate(eval_dataset):
-        logging.info(f"Evaluation for task {task_id} has started.")
-        model.adaptation(task_id)
+        train_loader = DataLoader(train_dataset[task_id], batch_size=cfg.train_batch_size, shuffle=True, num_workers=cfg.num_workers)
 
+        logging.info(f"Training for task {task_id} has started.")
+        model.adaptation(task_id)
+        # pdb.set_trace()
+        for epoch in range(epochs):
+            model.train()
+            logging.info(f"Task {task_id} Epoch {epoch+1}/{epochs} training started.")
+            for batch_idx, (inputs, targets, t) in enumerate(train_loader):
+                inputs, targets = inputs.to(device), targets.to(device)
+                optimizer.zero_grad()
+                outputs = model(inputs, test=False)["logits_per_image"]  # 使用现有的 forward 函数
+                loss = criterion(outputs, targets)
+                loss.backward()
+                optimizer.step()
+                if batch_idx % 10 == 0:  # 每 10 个 batch 打印一次日志
+                    logging.info(f"Task {task_id} Epoch {epoch+1}/{epochs} Batch {batch_idx} Loss: {loss.item()}")
+
+        logging.info(f"Evaluation for task {task_id} has started.")
+
+        model.eval()
         eval_loader = DataLoader(eval_dataset[:task_id + 1], batch_size=cfg.batch_size)
         for inputs, targets, task_ids in eval_loader:
             inputs, targets = inputs.to(device), targets.to(device)
-            outputs = model(inputs)
+            outputs = model(inputs,test=True)['probs']
             metric_logger.add([outputs.cpu().argmax(dim=1), targets.cpu(), task_ids], subset="test")
 
         acc_list.append(100 * metric_logger.accuracy)
@@ -58,39 +84,6 @@ def run_class_incremental(cfg, device):
 
 
 
-def run_domain_incremental(cfg, device):
-        
-    model = model = load_model(cfg, device)
-    eval_dataset, classes_names = build_cl_scenarios(
-        cfg, is_train=False, transforms=model.transforms
-    )
-    model.tokenize(classes_names)
-
-    with open(cfg.log_path, 'w+') as f: 
-        pass
-
-    logger = Logger(list_subsets=["test"])
-    logging.info(f">>> Evaluation scenario length is {len(eval_dataset)}")
-    for task_id, _ in enumerate(eval_dataset):
-
-        dataset_val = eval_dataset[:task_id + 1]
-        eval_loader = DataLoader(dataset_val, batch_size=cfg.batch_size)
-        for input, target, task_ids in tqdm(eval_loader):
-            input, target = input.to(device), target.to(device)
-            output = torch.from_numpy(model(input))
-            logger.add([output.cpu().argmax(dim=1), target.cpu(), task_ids], subset='test')
-
-        with open(cfg.log_path, 'a+') as f:
-            f.write(json.dumps({
-                'task': task_id,
-                'acc': round(100 * logger.accuracy, 2),
-            }) + '\n')
-            
-        logger.end_task()   
-
-def run_task_agnostic():
-    pass
-
 
 
 @hydra.main(config_path=None, config_name=None, version_base="1.1") 
@@ -106,15 +99,9 @@ def continual_clip(cfg: DictConfig) -> None:
     if cfg.scenario == "class":
         run_class_incremental(cfg, device)
 
-    elif cfg.scenario == "domain":
-        run_domain_incremental(cfg, device)
-
-    elif cfg.scenario == "task-agnostic":
-        NotImplementedError("Method has not been implemented. Soon be added.")
-
     else:
         ValueError(f"You have entered `{cfg.scenario}` which is not a defined scenario, " 
-                    "please choose from {{'class', 'domain', 'task-agnostic'}}.")
+                    "please choose from {{'class'}}.")
 
 
 
