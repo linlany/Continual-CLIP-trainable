@@ -5,6 +5,10 @@ import torch
 import torch.nn as nn
 from peft import get_peft_model, LoraConfig
 import pdb
+from transformers import CLIPTokenizer
+from packaging import version
+from typing import Union, List
+import sys
 
 from .utils import get_class_ids_per_task, get_class_names
 
@@ -112,4 +116,5 @@ def load_model(cfg: DictConfig, device: torch.device) -> nn.Module:
             `{cfg.scenarios}` is not a valid scenario, 
             Please choose from ['class', "domain', 'task-agnostic']
         """)
+
 

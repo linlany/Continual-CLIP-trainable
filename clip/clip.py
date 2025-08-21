@@ -24,7 +24,7 @@ if version.parse(torch.__version__) < version.parse("1.7.1"):
     warnings.warn("PyTorch version 1.7.1 or higher is recommended")
 
 
-__all__ = ["available_models", "load", "tokenize"]
+__all__ = ["available_models", "load", "tokenize", "tokenizer"]
 _tokenizer = _Tokenizer()
 
 _MODELS = {
@@ -90,6 +90,9 @@ def available_models() -> List[str]:
     """Returns the names of available CLIP models"""
     return list(_MODELS.keys())
 
+def tokenizer() -> _Tokenizer:
+    """Returns the tokenizer used by CLIP"""
+    return _tokenizer
 
 def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu", jit: bool = False, download_root: str = None):
     """Load a CLIP model
