@@ -1,10 +1,10 @@
 #!bin/bash
 
 # for imagenet-100 dataset; 10 classes/task
-torchrun --nproc_per_node=2 main.py \
+torchrun --nproc_per_node=4 main.py \
     --config-path configs/class \
     --config-name cifar100_10-10.yaml \
-    dataset_root="/home/u2120220613/cifar" \
+    dataset_root="/defaultShare/archive/huanglinlan" \
     class_order="class_orders/cifar100.yaml"
 
 
